@@ -317,6 +317,8 @@ def create_mailbox(
             project_code=extra.get("luckmail_project_code", ""),
             email_type=extra.get("luckmail_email_type", ""),
             domain=extra.get("luckmail_domain", ""),
+            source_tag=extra.get("luckmail_source_tag", ""),
+            registered_tag=extra.get("luckmail_registered_tag", "已注册"),
         )
     else:  # laoudo
         return LaoudoMailbox(
@@ -2419,7 +2421,7 @@ class MoeMailMailbox(BaseMailbox):
 
 
 class LuckMailMailbox(BaseMailbox):
-    """LuckMail 混合模式：ChatGPT 走购买邮箱，其他平台走订单接码"""
+    """LuckMail 混合模式：已购邮箱池模式 / 订单接码模式"""
 
     def __init__(
         self,
@@ -2428,6 +2430,8 @@ class LuckMailMailbox(BaseMailbox):
         project_code: str = "",
         email_type: str = "",
         domain: str = "",
+        source_tag: str = "",
+        registered_tag: str = "已注册",
     ):
         if not base_url or not api_key:
             raise RuntimeError(
@@ -2442,9 +2446,12 @@ class LuckMailMailbox(BaseMailbox):
         self._project_code = project_code
         self._email_type = email_type or None
         self._domain = domain or None
+        self._source_tag = source_tag or None
+        self._registered_tag = registered_tag or "已注册"
         self._order_no = None
         self._token = None
         self._email = None
+        self._purchase_id = None
 
     def _use_purchase_mode(self, account: MailboxAccount = None) -> bool:
         if (
@@ -2455,7 +2462,27 @@ class LuckMailMailbox(BaseMailbox):
             return True
         if self._token:
             return True
-        return self._project_code == "openai"
+        return self._project_code == "openai" or bool(self._source_tag)
+
+    def _resolve_source_tag_id(self) -> int:
+        if not self._source_tag:
+            return 0
+
+        try:
+            tags = self._client.user.get_tags()
+        except Exception as e:
+            raise RuntimeError(f"LuckMail 获取来源标签失败: {e}") from e
+
+        expected_name = str(self._source_tag).strip().lower()
+        for tag in tags:
+            if str(getattr(tag, "name", "")).strip().lower() != expected_name:
+                continue
+            tag_id = getattr(tag, "id", None)
+            if tag_id is None:
+                break
+            return int(tag_id)
+
+        raise RuntimeError(f"LuckMail 来源标签不存在: {self._source_tag}")
 
     def _resolve_token(self, account: MailboxAccount = None) -> str:
         token = (account.account_id if account else "") or self._token
@@ -2481,8 +2508,20 @@ class LuckMailMailbox(BaseMailbox):
             if str(item.email_address).strip().lower() == email_lower and item.token:
                 self._token = item.token
                 self._email = item.email_address
+                self._purchase_id = getattr(item, "id", None)
                 return item.token
         return ""
+
+    def mark_registered(self, success: bool) -> None:
+        if not success or not self._purchase_id or not self._registered_tag:
+            return
+        self._client.user.set_purchase_tag(
+            int(self._purchase_id),
+            tag_name=self._registered_tag,
+        )
+        self._log(
+            f"[LuckMail] 已标记注册邮箱 purchase_id={self._purchase_id} -> {self._registered_tag}"
+        )
 
     def _cancel_order_silently(self, order_no: str) -> None:
         if not order_no:
@@ -2526,45 +2565,56 @@ class LuckMailMailbox(BaseMailbox):
         return None
 
     def get_email(self) -> MailboxAccount:
-        if not self._project_code:
+        if not self._use_purchase_mode() and not self._project_code:
             raise RuntimeError("LuckMail 未设置 project_code，无法创建邮箱")
 
         if self._use_purchase_mode():
             self._log(
-                f"[LuckMail] 分支: ChatGPT + LuckMail -> 购买邮箱接口 "
-                f"(project_code={self._project_code}, email_type={self._email_type or '-'}, domain={self._domain or '-'})"
+                f"[LuckMail] 分支: 已购邮箱池 "
+                f"(source_tag={self._source_tag or '无标签'}, "
+                f"domain={self._domain or 'hotmail.com'}, "
+                f"mark_tag={self._registered_tag})"
             )
             try:
-                result = self._client.user.purchase_emails(
-                    project_code=self._project_code,
-                    quantity=1,
-                    email_type=self._email_type,
-                    domain=self._domain,
+                target_domain = (self._domain or "hotmail.com").lower()
+                tag_id = self._resolve_source_tag_id()
+                result = self._client.user.get_purchases(
+                    page=1,
+                    page_size=1,
+                    tag_id=tag_id,
+                    keyword=f"@{target_domain}",
+                    user_disabled=0,
                 )
+                items = result.list
+                self._log(f"[LuckMail] 获取到 @{target_domain} 邮箱: {items[0].email_address if items else '无'}")
             except Exception as e:
-                raise RuntimeError(f"LuckMail 购买邮箱失败: {e}") from e
+                raise RuntimeError(f"LuckMail 获取已购邮箱失败: {e}") from e
 
-            purchases = (result or {}).get("purchases") or []
-            if not purchases:
-                raise RuntimeError(f"LuckMail 购买邮箱返回为空: {result}")
+            if not items:
+                raise RuntimeError(
+                    f"LuckMail 已购邮箱池中没有 @{target_domain} 域名的邮箱"
+                )
 
-            item = purchases[0]
-            email = str(item.get("email_address") or "").strip()
-            token = str(item.get("token") or "").strip()
+            item = items[0]
+            email = str(item.email_address or "").strip()
+            token = str(item.token or "").strip()
+            purchase_id = getattr(item, "id", None)
             if not email or not token:
                 raise RuntimeError(f"LuckMail 返回缺少 email/token: {item}")
 
             self._email = email
             self._token = token
-            self._log(f"[LuckMail] 已购邮箱: {email}")
-            if item.get("warranty_until"):
-                self._log(f"[LuckMail] 质保到期: {item.get('warranty_until')}")
+            self._purchase_id = purchase_id
+            self._log(f"[LuckMail] 已购邮箱: {email} (id={purchase_id})")
+            if getattr(item, "warranty_until", None):
+                self._log(f"[LuckMail] 质保到期: {item.warranty_until}")
             return MailboxAccount(
                 email=email,
                 account_id=token,
                 extra={
                     "provider": "luckmail",
                     "token": token,
+                    "purchase_id": purchase_id,
                     "project_code": self._project_code,
                 },
             )
