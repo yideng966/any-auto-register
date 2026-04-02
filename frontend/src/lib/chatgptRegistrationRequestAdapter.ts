@@ -1,5 +1,6 @@
 import {
   CHATGPT_REGISTRATION_MODE_ACCESS_TOKEN_ONLY,
+  CHATGPT_REGISTRATION_MODE_HAIGE,
   CHATGPT_REGISTRATION_MODE_REFRESH_TOKEN,
   type ChatGPTRegistrationMode,
 } from '@/lib/chatgptRegistrationMode'
@@ -39,6 +40,20 @@ class AccessTokenOnlyChatGPTRegistrationRequestAdapter
   }
 }
 
+class HaigeChatGPTRegistrationRequestAdapter
+  implements ChatGPTRegistrationRequestAdapter
+{
+  readonly mode = CHATGPT_REGISTRATION_MODE_HAIGE
+
+  extendExtra(extra: RegistrationExtra): RegistrationExtra {
+    return {
+      ...extra,
+      chatgpt_registration_mode: this.mode,
+      chatgpt_has_refresh_token_solution: true,
+    }
+  }
+}
+
 export function buildChatGPTRegistrationRequestAdapter(
   platform: string | undefined,
   mode: ChatGPTRegistrationMode,
@@ -47,6 +62,9 @@ export function buildChatGPTRegistrationRequestAdapter(
 
   if (mode === CHATGPT_REGISTRATION_MODE_ACCESS_TOKEN_ONLY) {
     return new AccessTokenOnlyChatGPTRegistrationRequestAdapter()
+  }
+  if (mode === CHATGPT_REGISTRATION_MODE_HAIGE) {
+    return new HaigeChatGPTRegistrationRequestAdapter()
   }
 
   return new RefreshTokenChatGPTRegistrationRequestAdapter()

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import {
-  CHATGPT_REGISTRATION_MODE_REFRESH_TOKEN,
+  CHATGPT_REGISTRATION_MODE_ACCESS_TOKEN_ONLY,
   loadChatGPTRegistrationMode,
   saveChatGPTRegistrationMode,
   type ChatGPTRegistrationMode,
@@ -20,6 +20,6 @@ export function usePersistentChatGPTRegistrationMode() {
     mode,
     setMode,
     hasRefreshTokenSolution:
-      mode === CHATGPT_REGISTRATION_MODE_REFRESH_TOKEN,
+      mode !== CHATGPT_REGISTRATION_MODE_ACCESS_TOKEN_ONLY,
   }
 }
