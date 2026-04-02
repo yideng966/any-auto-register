@@ -10,6 +10,7 @@ from core.base_platform import Account, AccountStatus
 
 CHATGPT_REGISTRATION_MODE_REFRESH_TOKEN = "refresh_token"
 CHATGPT_REGISTRATION_MODE_ACCESS_TOKEN_ONLY = "access_token_only"
+CHATGPT_REGISTRATION_MODE_HAIGE = "haige"
 DEFAULT_CHATGPT_REGISTRATION_MODE = CHATGPT_REGISTRATION_MODE_REFRESH_TOKEN
 
 
@@ -35,6 +36,15 @@ def normalize_chatgpt_registration_mode(value) -> str:
         "true",
     }:
         return CHATGPT_REGISTRATION_MODE_REFRESH_TOKEN
+    if normalized in {
+        CHATGPT_REGISTRATION_MODE_HAIGE,
+        "haige_mode",
+        "海哥",
+        "海哥模式",
+        "pkce",
+        "oauth_pkce",
+    }:
+        return CHATGPT_REGISTRATION_MODE_HAIGE
     return DEFAULT_CHATGPT_REGISTRATION_MODE
 
 
@@ -131,10 +141,26 @@ class AccessTokenOnlyChatGPTRegistrationAdapter(BaseChatGPTRegistrationModeAdapt
         )
 
 
+class HaigeChatGPTRegistrationAdapter(BaseChatGPTRegistrationModeAdapter):
+    mode = CHATGPT_REGISTRATION_MODE_HAIGE
+
+    def _create_engine(self, context: ChatGPTRegistrationContext):
+        from platforms.chatgpt.haige_registration_engine import HaigeRegistrationEngine
+
+        return HaigeRegistrationEngine(
+            email_service=context.email_service,
+            proxy_url=context.proxy_url,
+            callback_logger=context.callback_logger,
+            max_retries=context.max_retries,
+        )
+
+
 def build_chatgpt_registration_mode_adapter(
     extra: Optional[dict],
 ) -> BaseChatGPTRegistrationModeAdapter:
     mode = resolve_chatgpt_registration_mode(extra)
     if mode == CHATGPT_REGISTRATION_MODE_ACCESS_TOKEN_ONLY:
         return AccessTokenOnlyChatGPTRegistrationAdapter()
+    if mode == CHATGPT_REGISTRATION_MODE_HAIGE:
+        return HaigeChatGPTRegistrationAdapter()
     return RefreshTokenChatGPTRegistrationAdapter()

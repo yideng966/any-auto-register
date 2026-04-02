@@ -154,6 +154,11 @@ class ChatGPTPlatform(BasePlatform):
         result = adapter.run(context)
         if not result or not result.success:
             raise RuntimeError(result.error_message if result else "注册失败")
+        if self.mailbox and hasattr(self.mailbox, "mark_registered"):
+            try:
+                self.mailbox.mark_registered(success=True)
+            except Exception as e:
+                log_fn(f"[ChatGPT] 注册成功后标记 LuckMail 邮箱失败: {e}")
 
         return adapter.build_account(result, password)
 
