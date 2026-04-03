@@ -9,6 +9,7 @@ class LuckMailMailboxTests(unittest.TestCase):
     def _build_mailbox(self):
         mailbox = LuckMailMailbox.__new__(LuckMailMailbox)
         mailbox._client = mock.Mock()
+        mailbox._mode = "auto"
         mailbox._project_code = "openai"
         mailbox._email_type = None
         mailbox._domain = None
@@ -28,6 +29,7 @@ class LuckMailMailboxTests(unittest.TestCase):
                 {
                     "luckmail_base_url": "https://mail.example.com",
                     "luckmail_api_key": "api-key",
+                    "luckmail_mode": "order",
                     "luckmail_project_code": "openai",
                     "luckmail_email_type": "hotmail",
                     "luckmail_domain": "hotmail.com",
@@ -39,12 +41,31 @@ class LuckMailMailboxTests(unittest.TestCase):
         mailbox_cls.assert_called_once_with(
             base_url="https://mail.example.com",
             api_key="api-key",
+            mode="order",
             project_code="openai",
             email_type="hotmail",
             domain="hotmail.com",
             source_tag="主池",
             registered_tag="已注册-海哥",
         )
+
+    def test_explicit_purchase_mode_overrides_legacy_logic(self):
+        mailbox = self._build_mailbox()
+        mailbox._mode = "purchase"
+        mailbox._project_code = "cursor"
+        mailbox._source_tag = None
+        mailbox._token = None
+
+        self.assertTrue(mailbox._use_purchase_mode())
+
+    def test_explicit_order_mode_overrides_openai_purchase_default(self):
+        mailbox = self._build_mailbox()
+        mailbox._mode = "order"
+        mailbox._project_code = "openai"
+        mailbox._source_tag = "主池"
+        mailbox._token = None
+
+        self.assertFalse(mailbox._use_purchase_mode())
 
     def test_get_email_resolves_source_tag_name_to_tag_id(self):
         mailbox = self._build_mailbox()

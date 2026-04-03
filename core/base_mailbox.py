@@ -314,6 +314,7 @@ def create_mailbox(
         return LuckMailMailbox(
             base_url=extra.get("luckmail_base_url") or "https://mails.luckyous.com/",
             api_key=extra.get("luckmail_api_key", ""),
+            mode=extra.get("luckmail_mode", ""),
             project_code=extra.get("luckmail_project_code", ""),
             email_type=extra.get("luckmail_email_type", ""),
             domain=extra.get("luckmail_domain", ""),
@@ -2427,6 +2428,7 @@ class LuckMailMailbox(BaseMailbox):
         self,
         base_url: str,
         api_key: str,
+        mode: str = "",
         project_code: str = "",
         email_type: str = "",
         domain: str = "",
@@ -2443,6 +2445,8 @@ class LuckMailMailbox(BaseMailbox):
             base_url=base_url,
             api_key=api_key,
         )
+        normalized_mode = str(mode or "").strip().lower()
+        self._mode = normalized_mode if normalized_mode in {"auto", "purchase", "order"} else "auto"
         self._project_code = project_code
         self._email_type = email_type or None
         self._domain = domain or None
@@ -2454,6 +2458,10 @@ class LuckMailMailbox(BaseMailbox):
         self._purchase_id = None
 
     def _use_purchase_mode(self, account: MailboxAccount = None) -> bool:
+        if self._mode == "purchase":
+            return True
+        if self._mode == "order":
+            return False
         if (
             account
             and account.account_id
@@ -2571,7 +2579,9 @@ class LuckMailMailbox(BaseMailbox):
         if self._use_purchase_mode():
             self._log(
                 f"[LuckMail] 分支: 已购邮箱池 "
-                f"(source_tag={self._source_tag or '无标签'}, "
+                f"(mode={self._mode}, "
+                f"project_code={self._project_code or '-'}, "
+                f"source_tag={self._source_tag or '无标签'}, "
                 f"domain={self._domain or 'hotmail.com'}, "
                 f"mark_tag={self._registered_tag})"
             )
@@ -2621,7 +2631,7 @@ class LuckMailMailbox(BaseMailbox):
 
         self._log(
             f"[LuckMail] 分支: 其他平台 + LuckMail -> 创建订单/订单接码 "
-            f"(project_code={self._project_code}, email_type={self._email_type or '-'})"
+            f"(mode={self._mode}, project_code={self._project_code}, email_type={self._email_type or '-'})"
         )
         try:
             body = {"project_code": self._project_code}

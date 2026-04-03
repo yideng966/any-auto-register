@@ -54,6 +54,11 @@ const SELECT_FIELDS: Record<string, { label: string; value: string }[]> = {
     { label: 'AT（Access Token，推荐）', value: 'at' },
     { label: 'RT（Refresh Token）', value: 'rt' },
   ],
+  luckmail_mode: [
+    { label: '自动（兼容旧逻辑）', value: 'auto' },
+    { label: '已购邮箱池', value: 'purchase' },
+    { label: '新购邮箱 / 订单接码', value: 'order' },
+  ],
 }
 
 const TAB_ITEMS = [
@@ -186,10 +191,11 @@ const TAB_ITEMS = [
       },
       {
         title: 'LuckMail',
-        desc: 'ChatGPT 走购买邮箱，其他平台继续走订单接码老逻辑',
+        desc: '可显式指定使用已购邮箱池或新购订单接码；自动模式保持旧逻辑兼容',
         fields: [
           { key: 'luckmail_base_url', label: '平台地址', placeholder: 'https://mails.luckyous.com' },
           { key: 'luckmail_api_key', label: 'API Key', secret: true },
+          { key: 'luckmail_mode', label: '取号模式', type: 'select' },
           { key: 'luckmail_email_type', label: '邮箱类型（可选）', placeholder: 'ms_graph / ms_imap / self_built' },
           { key: 'luckmail_domain', label: '邮箱域名（可选）', placeholder: 'outlook.com / gmail.com' },
         ],
@@ -1084,6 +1090,9 @@ export default function Settings() {
       }
       if (!data.luckmail_base_url) {
         data.luckmail_base_url = 'https://mails.luckyous.com/'
+      }
+      if (!data.luckmail_mode) {
+        data.luckmail_mode = 'auto'
       }
       if (!data.cloudmail_timeout) {
         data.cloudmail_timeout = 30

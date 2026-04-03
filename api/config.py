@@ -61,6 +61,7 @@ CONFIG_KEYS = [
     "smstome_sync_max_pages_per_country",
     "luckmail_base_url",
     "luckmail_api_key",
+    "luckmail_mode",
     "luckmail_email_type",
     "luckmail_domain",
     "cpa_api_url",
@@ -102,6 +103,8 @@ def get_config():
         all_cfg["gptmail_base_url"] = "https://mail.chatgpt.org.uk"
     if not all_cfg.get("luckmail_base_url"):
         all_cfg["luckmail_base_url"] = "https://mails.luckyous.com/"
+    if not all_cfg.get("luckmail_mode"):
+        all_cfg["luckmail_mode"] = "auto"
     # 只返回已知 key，未设置的返回空字符串
     return {k: all_cfg.get(k, "") for k in CONFIG_KEYS}
 
