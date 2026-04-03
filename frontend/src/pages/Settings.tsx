@@ -203,6 +203,7 @@ const TAB_ITEMS = [
         fields: [
           { key: 'sub2api_api_url', label: 'API URL', placeholder: 'https://your-sub2api.example.com' },
           { key: 'sub2api_api_key', label: 'API Key', secret: true },
+          { key: 'sub2api_group_ids', label: '分组 ID', placeholder: '14 或 9,14；留空默认 2' },
         ],
       },
       {
@@ -1064,10 +1065,26 @@ export default function Settings() {
     })
   }, [form])
 
+  const collectConfigValues = () => {
+    const values: Record<string, any> = {}
+    for (const tab of TAB_ITEMS) {
+      for (const section of tab.sections) {
+        for (const field of section.fields) {
+          values[field.key] = form.getFieldValue(field.key)
+        }
+      }
+    }
+    values.cfworker_domains = form.getFieldValue('cfworker_domains')
+    values.cfworker_enabled_domains = form.getFieldValue('cfworker_enabled_domains')
+    values.cfworker_domain = form.getFieldValue('cfworker_domain')
+    values.cfworker_random_subdomain = form.getFieldValue('cfworker_random_subdomain')
+    return values
+  }
+
   const save = async () => {
     setSaving(true)
     try {
-      const values = form.getFieldsValue(true)
+      const values = collectConfigValues()
       const domains = normalizeDomainList(values.cfworker_domains)
       const enabledDomains = normalizeDomainList(values.cfworker_enabled_domains).filter((domain) => domains.includes(domain))
 

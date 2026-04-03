@@ -8,7 +8,7 @@ import base64
 import json
 import logging
 import time
-from typing import Any, Tuple
+from typing import Any, Iterable, Tuple
 
 from curl_cffi import requests as cffi_requests
 
@@ -66,6 +66,53 @@ def _extract_organization_id(id_token_payload: dict[str, Any]) -> str:
     return ""
 
 
+def _parse_group_ids(raw_group_ids: Any) -> list[int]:
+    if raw_group_ids is None:
+        return []
+
+    if isinstance(raw_group_ids, str):
+        items = [part.strip() for part in raw_group_ids.replace("，", ",").split(",")]
+    elif isinstance(raw_group_ids, Iterable):
+        items = [str(part).strip() for part in raw_group_ids]
+    else:
+        items = [str(raw_group_ids).strip()]
+
+    group_ids: list[int] = []
+    seen = set()
+    invalid: list[str] = []
+    for item in items:
+        if not item:
+            continue
+        if not item.isdigit():
+            invalid.append(item)
+            continue
+        value = int(item)
+        if value <= 0:
+            invalid.append(item)
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        group_ids.append(value)
+
+    if invalid:
+        raise ValueError(f"Sub2API 分组 ID 配置无效: {', '.join(invalid)}")
+    return group_ids
+
+
+def _resolve_group_ids(group_ids: Any = None) -> list[int]:
+    resolved = _parse_group_ids(group_ids)
+    if resolved:
+        return resolved
+
+    configured = _get_config_value("sub2api_group_ids")
+    resolved = _parse_group_ids(configured)
+    if resolved:
+        return resolved
+
+    return list(DEFAULT_GROUP_IDS)
+
+
 def _build_sub2api_account_payload(account, group_ids: list[int] | None = None) -> dict[str, Any]:
     token_data = generate_token_json(account)
     access_token = str(token_data.get("access_token") or "").strip()
@@ -101,7 +148,7 @@ def _build_sub2api_account_payload(account, group_ids: list[int] | None = None) 
             "id_token": id_token,
         },
         "extra": {"email": email},
-        "group_ids": group_ids or DEFAULT_GROUP_IDS,
+        "group_ids": group_ids or list(DEFAULT_GROUP_IDS),
         "concurrency": 10,
         "priority": 1,
         "auto_pause_on_expired": True,
@@ -112,7 +159,7 @@ def upload_to_sub2api(
     account,
     api_url: str | None = None,
     api_key: str | None = None,
-    group_ids: list[int] | None = None,
+    group_ids: Any = None,
 ) -> Tuple[bool, str]:
     """上传单个账号到 Sub2API 管理后台。"""
     api_url = str(api_url or _get_config_value("sub2api_api_url")).strip()
@@ -123,7 +170,12 @@ def upload_to_sub2api(
     if not api_key:
         return False, "Sub2API API Key 未配置"
 
-    payload = _build_sub2api_account_payload(account, group_ids=group_ids)
+    try:
+        resolved_group_ids = _resolve_group_ids(group_ids)
+    except ValueError as exc:
+        return False, str(exc)
+
+    payload = _build_sub2api_account_payload(account, group_ids=resolved_group_ids)
     url = f"{api_url.rstrip('/')}/api/v1/admin/accounts"
     headers = {
         "Content-Type": "application/json",
