@@ -28,6 +28,12 @@ import { apiFetch } from '@/lib/utils'
 
 const { Text } = Typography
 
+const LUCKMAIL_MODE_OPTIONS = [
+  { label: '自动（兼容旧逻辑）', value: 'auto' },
+  { label: '已购邮箱池', value: 'purchase' },
+  { label: '新购邮箱 / 订单接码', value: 'order' },
+]
+
 export default function RegisterTaskPage() {
   const [form] = Form.useForm()
   const [task, setTask] = useState<any>(null)
@@ -94,6 +100,7 @@ export default function RegisterTaskPage() {
         smstome_sync_max_pages_per_country: cfg.smstome_sync_max_pages_per_country || '',
         luckmail_base_url: cfg.luckmail_base_url || 'https://mails.luckyous.com/',
         luckmail_api_key: cfg.luckmail_api_key || '',
+        luckmail_mode: cfg.luckmail_mode || 'auto',
         luckmail_email_type: cfg.luckmail_email_type || '',
         luckmail_domain: cfg.luckmail_domain || '',
       })
@@ -155,6 +162,7 @@ export default function RegisterTaskPage() {
       smstome_sync_max_pages_per_country: values.smstome_sync_max_pages_per_country,
       luckmail_base_url: values.luckmail_base_url,
       luckmail_api_key: values.luckmail_api_key,
+      luckmail_mode: values.luckmail_mode,
       luckmail_email_type: values.luckmail_email_type,
       luckmail_domain: values.luckmail_domain,
       yescaptcha_key: values.yescaptcha_key,
@@ -231,6 +239,7 @@ export default function RegisterTaskPage() {
         applemail_base_url: 'https://www.appleemail.top',
         applemail_pool_dir: 'mail',
         applemail_mailboxes: 'INBOX,Junk',
+        luckmail_mode: 'auto',
         gptmail_base_url: 'https://mail.chatgpt.org.uk',
         cloudmail_timeout: 30,
         count: 1,
@@ -503,6 +512,9 @@ export default function RegisterTaskPage() {
               </Form.Item>
               <Form.Item name="luckmail_api_key" label="API Key">
                 <Input.Password placeholder="ak_..." />
+              </Form.Item>
+              <Form.Item name="luckmail_mode" label="取号模式">
+                <Select options={LUCKMAIL_MODE_OPTIONS} />
               </Form.Item>
               <Form.Item name="luckmail_email_type" label="邮箱类型（可选）">
                 <Input placeholder="ms_graph / ms_imap" />

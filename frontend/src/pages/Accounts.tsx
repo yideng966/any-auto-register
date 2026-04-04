@@ -680,6 +680,7 @@ export default function Accounts() {
         smstome_sync_max_pages_per_country: cfg.smstome_sync_max_pages_per_country,
         luckmail_base_url: cfg.luckmail_base_url,
         luckmail_api_key: cfg.luckmail_api_key,
+        luckmail_mode: cfg.luckmail_mode || 'auto',
         luckmail_email_type: cfg.luckmail_email_type,
         luckmail_domain: cfg.luckmail_domain,
       }

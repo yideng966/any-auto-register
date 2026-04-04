@@ -66,6 +66,11 @@ def _prepare_register_request(req: RegisterTaskRequest) -> RegisterTaskRequest:
     )
     if mail_provider == "luckmail":
         platform = prepared.platform
+        prepared.extra["luckmail_mode"] = (
+            prepared.extra.get("luckmail_mode")
+            or config_store.get("luckmail_mode", "")
+            or "auto"
+        )
         if platform in ("tavily", "openblocklabs"):
             raise HTTPException(400, f"LuckMail 渠道暂时不支持 {platform} 项目注册")
 
