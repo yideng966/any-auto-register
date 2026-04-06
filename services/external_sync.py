@@ -7,8 +7,16 @@ from typing import Any
 from services.chatgpt_sync import (
     _get_account_extra,
     persist_cpa_sync_result,
+    persist_sub2api_sync_result,
     upload_chatgpt_account_to_cpa,
 )
+
+
+def _is_config_enabled(value: Any, default: bool = False) -> bool:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return default
+    return normalized in {"1", "true", "yes", "on", "enabled"}
 
 
 def sync_account(account) -> list[dict[str, Any]]:
@@ -35,8 +43,32 @@ def sync_account(account) -> list[dict[str, Any]]:
     if platform == "chatgpt":
         upload_account = _build_chatgpt_upload_account()
 
+        # 贡献模式优先级最高：开启后仅上传到贡献服务器，避免重复上报到其它平台。
+        contribution_enabled = _is_config_enabled(config_store.get("contribution_enabled", "0"))
+        if contribution_enabled:
+            contribution_url = str(config_store.get("contribution_server_url", "") or "").strip()
+            contribution_key = str(config_store.get("contribution_key", "") or "").strip()
+            if not contribution_url:
+                msg = "Contribution 服务器地址未配置"
+                persist_cpa_sync_result(account, False, msg)
+                results.append({"name": "Contribution", "ok": False, "msg": msg})
+                return results
+
+            ok, msg = upload_chatgpt_account_to_cpa(
+                account,
+                api_url=contribution_url,
+                api_key=contribution_key or None,
+            )
+            persist_cpa_sync_result(account, ok, msg)
+            results.append({"name": "Contribution", "ok": ok, "msg": msg})
+            return results
+
         cpa_url = str(config_store.get("cpa_api_url", "") or "").strip()
-        if cpa_url:
+        cpa_enabled = _is_config_enabled(
+            config_store.get("cpa_enabled", ""),
+            default=bool(cpa_url),
+        )
+        if cpa_enabled and cpa_url:
             ok, msg = upload_chatgpt_account_to_cpa(account)
             persist_cpa_sync_result(account, ok, msg)
             results.append({"name": "CPA", "ok": ok, "msg": msg})
@@ -65,7 +97,11 @@ def sync_account(account) -> list[dict[str, Any]]:
         # 关键逻辑：ChatGPT 现在支持同时回填 CPA 和 Sub2API，互不覆盖、分别上报结果。
         sub2api_url = str(config_store.get("sub2api_api_url", "") or "").strip()
         sub2api_key = str(config_store.get("sub2api_api_key", "") or "").strip()
-        if sub2api_url and sub2api_key:
+        sub2api_enabled = _is_config_enabled(
+            config_store.get("sub2api_enabled", ""),
+            default=bool(sub2api_url and sub2api_key),
+        )
+        if sub2api_enabled and sub2api_url and sub2api_key:
             from platforms.chatgpt.sub2api_upload import upload_to_sub2api
 
             ok, msg = upload_to_sub2api(
@@ -73,6 +109,7 @@ def sync_account(account) -> list[dict[str, Any]]:
                 api_url=sub2api_url,
                 api_key=sub2api_key,
             )
+            persist_sub2api_sync_result(account, ok, msg)
             results.append({"name": "Sub2API", "ok": ok, "msg": msg})
 
     elif platform == "grok":

@@ -57,6 +57,7 @@ CONFIG_KEYS = [
     "cfworker_enabled_domains",
     "cfworker_subdomain",
     "cfworker_random_subdomain",
+    "cfworker_random_name_subdomain",
     "cfworker_fingerprint",
     "smstome_cookie",
     "smstome_country_slugs",
@@ -69,6 +70,7 @@ CONFIG_KEYS = [
     "luckmail_mode",
     "luckmail_email_type",
     "luckmail_domain",
+    "cpa_enabled",
     "cpa_api_url",
     "cpa_api_key",
     "cpa_cleanup_enabled",
@@ -76,6 +78,7 @@ CONFIG_KEYS = [
     "cpa_cleanup_threshold",
     "cpa_cleanup_concurrency",
     "cpa_cleanup_register_delay_seconds",
+    "sub2api_enabled",
     "sub2api_api_url",
     "sub2api_api_key",
     "sub2api_group_ids",
@@ -92,6 +95,9 @@ CONFIG_KEYS = [
     "grok2api_quota",
     "kiro_manager_path",
     "kiro_manager_exe",
+    "contribution_enabled",
+    "contribution_server_url",
+    "contribution_key",
 ]
 
 
@@ -123,6 +129,8 @@ def get_config():
         all_cfg["luckmail_base_url"] = "https://mails.luckyous.com/"
     if not all_cfg.get("luckmail_mode"):
         all_cfg["luckmail_mode"] = "auto"
+    if not all_cfg.get("contribution_server_url"):
+        all_cfg["contribution_server_url"] = "http://new.xem8k5.top:7317/"
     # 只返回已知 key，未设置的返回空字符串
     return {k: all_cfg.get(k, "") for k in CONFIG_KEYS}
 
