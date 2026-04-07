@@ -262,6 +262,20 @@ def _run_register(task_id: str, req: RegisterTaskRequest):
                     password=req.password,
                 )
                 current_email = account.email or current_email
+                if str(merged_extra.get("mail_provider", "")).strip() == "cfworker":
+                    from core.email_domain_policy import validate_email_domain_policy
+
+                    validate_email_domain_policy(
+                        account.email,
+                        {
+                            "email_domain_rule_enabled": merged_extra.get(
+                                "email_domain_rule_enabled", "0"
+                            ),
+                            "email_domain_level_count": merged_extra.get(
+                                "email_domain_level_count", "2"
+                            ),
+                        },
+                    )
                 if isinstance(account.extra, dict):
                     mail_provider = merged_extra.get("mail_provider", "")
                     if mail_provider:

@@ -221,6 +221,8 @@ const TAB_ITEMS = [
           { key: 'cfworker_admin_token', label: '管理员 Token', secret: true },
           { key: 'cfworker_custom_auth', label: '站点密码', secret: true },
           { key: 'cfworker_subdomain', label: '固定子域名', placeholder: 'mail / pool-a' },
+          { key: 'email_domain_rule_enabled', label: '启用域名规则', type: 'boolean' },
+          { key: 'email_domain_level_count', label: '域名级数（N 级）', placeholder: '例如 2 / 3 / 4' },
           { key: 'cfworker_random_subdomain', label: '随机子域名', type: 'boolean' },
           { key: 'cfworker_random_name_subdomain', label: '随机姓名子域名', type: 'boolean' },
           { key: 'cfworker_fingerprint', label: 'Fingerprint', placeholder: '6703363b...' },
@@ -570,6 +572,10 @@ function ConfigField({ field }: { field: FieldConfig }) {
   const helpText =
     field.key === 'default_executor'
       ? '仅对支持的平台生效；ChatGPT、Cursor、Grok、Kiro、Tavily、Trae 支持浏览器模式，OpenBlockLabs 仅支持纯协议。'
+      : field.key === 'email_domain_rule_enabled'
+      ? '仅 CF Worker 生效：开启后会校验域名级数，以及域名至少包含 2 个字母和 2 个数字。'
+      : field.key === 'email_domain_level_count'
+      ? '例如 2=example.com，3=a.example.com，4=a.b.example.com。'
       : undefined
 
   return (
@@ -1663,6 +1669,10 @@ export default function Settings() {
       data.cfworker_random_subdomain = parseBooleanConfigValue(data.cfworker_random_subdomain)
       data.cfworker_random_name_subdomain = parseBooleanConfigValue(data.cfworker_random_name_subdomain)
       data.contribution_enabled = parseBooleanConfigValue(data.contribution_enabled)
+      data.email_domain_rule_enabled = parseBooleanConfigValue(data.email_domain_rule_enabled)
+      if (!String(data.email_domain_level_count ?? '').trim()) {
+        data.email_domain_level_count = 2
+      }
       data.mail_import_source = configMailProvider === 'applemail' ? 'applemail' : 'microsoft'
       data.mail_provider = isMailImportProvider ? 'mail_import' : configMailProvider
       form.setFieldsValue(data)
@@ -1727,6 +1737,19 @@ export default function Settings() {
       values.cfworker_random_subdomain = parseBooleanConfigValue(values.cfworker_random_subdomain)
       values.cfworker_random_name_subdomain = parseBooleanConfigValue(values.cfworker_random_name_subdomain)
       values.contribution_enabled = parseBooleanConfigValue(values.contribution_enabled)
+      values.email_domain_rule_enabled = parseBooleanConfigValue(values.email_domain_rule_enabled)
+      const rawDomainLevelCount = Number.parseInt(String(values.email_domain_level_count ?? '').trim(), 10)
+      if (values.mail_provider === 'cfworker' && values.email_domain_rule_enabled) {
+        if (!Number.isInteger(rawDomainLevelCount) || rawDomainLevelCount < 2) {
+          setActiveTab('mailbox')
+          message.error('域名级数必须是大于等于 2 的整数')
+          return
+        }
+      }
+      values.email_domain_level_count =
+        Number.isInteger(rawDomainLevelCount) && rawDomainLevelCount >= 2
+          ? String(rawDomainLevelCount)
+          : '2'
 
       await apiFetch('/config', { method: 'PUT', body: JSON.stringify({ data: values }) })
       form.setFieldsValue({
@@ -1740,6 +1763,8 @@ export default function Settings() {
         cfworker_random_subdomain: values.cfworker_random_subdomain,
         cfworker_random_name_subdomain: values.cfworker_random_name_subdomain,
         contribution_enabled: values.contribution_enabled,
+        email_domain_rule_enabled: values.email_domain_rule_enabled,
+        email_domain_level_count: values.email_domain_level_count,
       })
       message.success('保存成功')
       setSaved(true)
